@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>佑德随机闪卡</title>
+<title>佑德闪卡</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -66,20 +66,15 @@ html,body{height:100%;background:#000;overflow:hidden;user-select:none;-webkit-u
 
 <script>
 /* ==================== 只改这里 ==================== */
-const PREFIX = "images/img(";   // 图片路径 + 文件名前缀
-const START  = 1;            // 起始编号
-const TOTAL  = 65;           // ★图片总张数（必须与实际一致）
-const SEC    = 3;            // 每张停留秒数
-const EXT    = ").jpg";       // 后缀，png 就写 ".png"
+const TOTAL = 65;   // ★图片总张数（必须与实际一致）
+const SEC   = 3;    // 每张停留秒数
 /* ================================================= */
 
-// 自动生成本轮文件列表
+// 自动生成文件列表：images/img (1).jpg  ~  images/img (65).jpg
 function buildFiles(){
-  const arr=[];
-  for(let n=START;n<START+TOTAL;n++){
-    // 编号补零：1→001, 10→010, 100→100
-    const num = n<10?"00"+n : n<100?"0"+n : ""+n;
-    arr.push(PREFIX+num+EXT);
+  const arr = [];
+  for(let n = 1; n <= TOTAL; n++){
+    arr.push("images/img (" + n + ").jpg");
   }
   return arr;
 }
@@ -172,4 +167,3 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
 </script>
 </body>
 </html>
-
