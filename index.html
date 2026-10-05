@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>随机轮播</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<style>
+*{margin:0;padding:0}
+html,body{height:100%;background:#000;overflow:hidden;user-select:none;-webkit-user-select:none}
+img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    max-width:100vw;max-height:100vh;object-fit:contain;
+    opacity:0;transition:opacity .5s ease}
+img.show{opacity:1}
+#bar{position:fixed;bottom:0;left:0;right:0;height:42px;
+     background:linear-gradient(transparent,rgba(0,0,0,.8));
+     color:#ddd;font:15px/42px "PingFang SC","Microsoft YaHei",sans-serif;
+     text-align:center;opacity:0;transition:opacity .4s;pointer-events:none;z-index:10}
+#bar.on{opacity:1}
+#hint{position:fixed;inset:0;background:rgba(0,0,0,.9);color:#fff;
+      display:flex;align-items:center;justify-content:center;flex-direction:column;
+      font:18px/1.6 "PingFang SC","Microsoft YaHei",sans-serif;text-align:center;
+      padding:40px;z-index:99}
+#hint b{font-size:42px;margin-bottom:10px;display:block}
+#hint small{font-size:13px;color:#999;margin-top:8px}
+#installBtn{position:fixed;top:12px;right:12px;z-index:20;
+            background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);
+            padding:6px 14px;border-radius:20px;font-size:13px;display:none;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div id="hint"><b>↻</b>请把手机横过来观看<small>点击屏幕开始播放</small></div>
+<img id="pic" alt="">
+<div id="bar"></div>
+<button id="installBtn">📲 安装到桌面</button>
+
+<script>
+/* ================== 只改这里 ================== */
+const PREFIX = "images/img (";   // 图片路径+文件名前半段
+const START  = 1;                // 起始编号
+const TOTAL  = 65;               // ★图片总张数（必须与实际一致）
+const SEC    = 3;                // 每张停留秒数
+const EXT    = ").jpg";           // 后缀，png 就写 ".png"
+/* ============================================== */
+
+// 自动生成文件列表；如果编号是三位数如 001.jpg，把 PREFIX 改成 "images/00" 之类即可
+const FILES = [];
+for (let n = START; n < START + TOTAL; n++) FILES.push(PREFIX + n + EXT);
+
+let order=[], idx=0, timer, wakeLock=null;
+const pic=document.getElementById('pic'), bar=document.getElementById('bar'), hint=document.getElementById('hint');
+
+/* ---- Fisher-Yates 洗牌（真随机、不重不漏）---- */
+function shuffle(a){
+  for(let n=a.length-1;n>0;n--){
+    const k=Math.floor(Math.random()*(n+1));
+    [a[n],a[k]]=[a[k],a[n]];
+  }
+  return a;
+}
+function newRound(){ order=shuffle(FILES.slice()); idx=0; }
+
+/* ---- 保持屏幕常亮 ---- */
+async function keepAwake(){
+  try{ if('wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') keepAwake(); });
+
+/* ---- 切图 ---- */
+function next(){
+  clearTimeout(timer);
+  pic.classList.remove('show');
+  setTimeout(()=>{
+    pic.src = order[idx];
+    pic.onload = ()=> pic.classList.add('show');
+    pic.onerror = ()=>{ idx++; if(idx<order.length) next(); else { newRound(); next(); } };  // 坏图自动跳过
+    bar.textContent = (idx+1)+' / '+order.length;
+    bar.classList.add('on'); setTimeout(()=> bar.classList.remove('on'), 1200);
+    idx++;
+    if(idx >= order.length) setTimeout(()=>{ newRound(); next(); }, SEC*1000);
+    else timer = setTimeout(next, SEC*1000);
+  }, 520);
+}
+
+/* ---- 触屏：左滑下一张、右滑上一张、轻点显示进度 ---- */
+let tx=0;
+document.addEventListener('touchstart', e=>{ tx=e.changedTouches[0].screenX; }, {passive:true});
+document.addEventListener('touchend', e=>{
+  const dx=e.changedTouches[0].screenX-tx;
+  if(Math.abs(dx)>40){
+    clearTimeout(timer);
+    if(dx<0) next(); else { idx=Math.max(0,idx-2); next(); }
+  } else { bar.classList.add('on'); setTimeout(()=> bar.classList.remove('on'),1200); }
+}, {passive:true});
+
+/* ---- 横屏提示 & 点击开始 ---- */
+function checkOri(){ hint.style.display = (innerWidth > innerHeight) ? 'none' : 'flex'; }
+window.addEventListener('resize', checkOri);
+hint.addEventListener('click', ()=>{ keepAwake(); checkOri(); });
+document.addEventListener('click', ()=> keepAwake(), {once:true});
+
+/* ---- PWA 安装按钮（仅安卓 Chrome 会触发）---- */
+let deferredPrompt=null;
+const btn=document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt', e=>{
+  e.preventDefault(); deferredPrompt=e; btn.style.display='block';
+});
+btn.addEventListener('click', async ()=>{
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const r=await deferredPrompt.userChoice;
+  if(r.outcome==='accepted') btn.style.display='none';
+  deferredPrompt=null;
+});
+window.addEventListener('appinstalled', ()=>{ btn.style.display='none'; });
+
+/* ---- 注册 Service Worker（离线可用）---- */
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+
+newRound(); checkOri(); next();
+</script>
+</body>
+</html>
