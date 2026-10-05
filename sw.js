@@ -1,4 +1,4 @@
-const VER = 'slideshow-v1';          // 换版本时改这个字符串即可强制更新
+const VER = 'slideshow-v2';          // 换版本时改这个字符串即可强制更新
 const SHELL = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
