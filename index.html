@@ -98,7 +98,12 @@ document.addEventListener('touchend', e=>{
 }, {passive:true});
 
 /* ---- 横屏提示 & 点击开始 ---- */
-function checkOri(){ hint.style.display = (innerWidth > innerHeight) ? 'none' : 'flex'; }
+function checkOri(){
+  const isLandscape = innerWidth > innerHeight
+
+    || (screen.orientation && screen.orientation.type && screen.orientation.type.includes('landscape'));
+  hint.style.display = isLandscape ? 'none' : 'flex';
+}
 window.addEventListener('resize', checkOri);
 hint.addEventListener('click', ()=>{ keepAwake(); checkOri(); });
 document.addEventListener('click', ()=> keepAwake(), {once:true});
