@@ -1,7 +1,6 @@
 {
   "name": "佑德汉字注音符号拼音闪卡",
-  "short_name": "佑德闪卡",
-  "description": "随机顺序循环播放图片",
+  "short_name": "佑德字卡闪卡",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "landscape",

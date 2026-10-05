@@ -3,118 +3,173 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>随机轮播</title>
+<title>佑德随机闪卡</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <style>
-*{margin:0;padding:0}
-html,body{height:100%;background:#000;overflow:hidden;user-select:none;-webkit-user-select:none}
-img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    max-width:100vw;max-height:100vh;object-fit:contain;
-    opacity:0;transition:opacity .5s ease}
-img.show{opacity:1}
-#bar{position:fixed;bottom:0;left:0;right:0;height:42px;
-     background:linear-gradient(transparent,rgba(0,0,0,.8));
-     color:#ddd;font:15px/42px "PingFang SC","Microsoft YaHei",sans-serif;
-     text-align:center;opacity:0;transition:opacity .4s;pointer-events:none;z-index:10}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:#000;overflow:hidden;user-select:none;-webkit-user-select:none;
+          font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+
+/* 图片 */
+#pic{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+     max-width:100vw;max-height:100vh;object-fit:contain;opacity:0;transition:opacity .45s ease}
+#pic.show{opacity:1}
+
+/* 底部计数器 */
+#bar{position:fixed;bottom:0;left:0;right:0;height:40px;
+     background:linear-gradient(transparent,rgba(0,0,0,.85));
+     color:#ddd;font:14px/40px "PingFang SC","Microsoft YaHei",sans-serif;
+     text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;z-index:10}
 #bar.on{opacity:1}
-#hint{position:fixed;inset:0;background:rgba(0,0,0,.9);color:#fff;
-      display:flex;align-items:center;justify-content:center;flex-direction:column;
-      font:18px/1.6 "PingFang SC","Microsoft YaHei",sans-serif;text-align:center;
-      padding:40px;z-index:99}
-#hint b{font-size:42px;margin-bottom:10px;display:block}
-#hint small{font-size:13px;color:#999;margin-top:8px}
-#installBtn{position:fixed;top:12px;right:12px;z-index:20;
-            background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);
-            padding:6px 14px;border-radius:20px;font-size:13px;display:none;cursor:pointer}
+
+/* 开始 / 结束 遮罩层 */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.92);
+         display:flex;flex-direction:column;align-items:center;justify-content:center;
+         z-index:20;transition:opacity .3s}
+.overlay.hide{opacity:0;pointer-events:none}
+.overlay h1{color:#fff;font-size:22px;margin-bottom:28px;text-align:center}
+.overlay .sub{color:#888;font-size:13px;margin-top:10px}
+.btn{padding:14px 48px;border-radius:28px;border:none;font-size:18px;font-weight:600;
+     color:#fff;cursor:pointer;letter-spacing:2px;
+     background:linear-gradient(135deg,#667eea,#764ba2)}
+.btn:active{transform:scale(.96)}
+.btn.done{background:linear-gradient(135deg,#f093fb,#f5576c)}
+
+/* 安装按钮（仅安卓 Chrome 出现） */
+#installBtn{position:fixed;top:12px;right:12px;z-index:30;
+            background:rgba(255,255,255,.12);color:#ccc;border:1px solid rgba(255,255,255,.25);
+            padding:5px 12px;border-radius:16px;font-size:12px;display:none;cursor:pointer}
 </style>
 </head>
 <body>
+
+<!-- 开始界面 -->
+<div id="startScreen" class="overlay">
+  <h1>📷 佑德随机闪卡</h1>
+  <button class="btn" id="startBtn">开始播放</button>
+  <p class="sub" id="info"></p>
+</div>
+
+<!-- 结束界面 -->
+<div id="endScreen" class="overlay hide">
+  <h1>🎉 本轮播放完毕</h1>
+  <button class="btn done" id="againBtn">再来一轮</button>
+  <p class="sub">本轮共播放 <span id="played">0</span> 张图片</p>
+</div>
 
 <img id="pic" alt="">
 <div id="bar"></div>
 <button id="installBtn">📲 安装到桌面</button>
 
 <script>
-/* ================== 只改这里 ================== */
-const PREFIX = "images/img (";   // 图片路径+文件名前半段
-const START  = 1;                // 起始编号
-const TOTAL  = 65;               // ★图片总张数（必须与实际一致）
-const SEC    = 3;                // 每张停留秒数
-const EXT    = ").jpg";           // 后缀，png 就写 ".png"
-/* ============================================== */
+/* ==================== 只改这里 ==================== */
+const PREFIX = "images/img(";   // 图片路径 + 文件名前缀
+const START  = 1;            // 起始编号
+const TOTAL  = 65;           // ★图片总张数（必须与实际一致）
+const SEC    = 3;            // 每张停留秒数
+const EXT    = ").jpg";       // 后缀，png 就写 ".png"
+/* ================================================= */
 
-// 自动生成文件列表；如果编号是三位数如 001.jpg，把 PREFIX 改成 "images/00" 之类即可
-const FILES = [];
-for (let n = START; n < START + TOTAL; n++) FILES.push(PREFIX + n + EXT);
+// 自动生成本轮文件列表
+function buildFiles(){
+  const arr=[];
+  for(let n=START;n<START+TOTAL;n++){
+    // 编号补零：1→001, 10→010, 100→100
+    const num = n<10?"00"+n : n<100?"0"+n : ""+n;
+    arr.push(PREFIX+num+EXT);
+  }
+  return arr;
+}
 
-let order=[], idx=0, timer, wakeLock=null;
-const pic=document.getElementById('pic'), bar=document.getElementById('bar'), hint=document.getElementById('hint');
-
-/* ---- Fisher-Yates 洗牌（真随机、不重不漏）---- */
+// Fisher-Yates 真随机洗牌
 function shuffle(a){
-  for(let n=a.length-1;n>0;n--){
-    const k=Math.floor(Math.random()*(n+1));
-    [a[n],a[k]]=[a[k],a[n]];
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
   }
   return a;
 }
-function newRound(){ order=shuffle(FILES.slice()); idx=0; }
 
-/* ---- 保持屏幕常亮 ---- */
-async function keepAwake(){
-  try{ if('wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); }catch(e){}
+let order=[], idx=0, timer=null;
+const pic=document.getElementById('pic');
+const bar=document.getElementById('bar');
+const startScr=document.getElementById('startScreen');
+const endScr=document.getElementById('endScreen');
+const playedSpan=document.getElementById('played');
+const info=document.getElementById('info');
+
+info.textContent = "共 "+TOTAL+" 张 · 每张 "+SEC+" 秒";
+
+/* ---------- 开始一轮 ---------- */
+function startRound(){
+  startScr.classList.add('hide');
+  endScr.classList.add('hide');
+  order = shuffle(buildFiles());   // 每次全部重新打乱
+  idx = 0;
+  showNext();
 }
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') keepAwake(); });
 
-/* ---- 切图 ---- */
-function next(){
+/* ---------- 显示下一张 ---------- */
+function showNext(){
   clearTimeout(timer);
+  if(idx >= order.length){ finish(); return; }
+
   pic.classList.remove('show');
   setTimeout(()=>{
     pic.src = order[idx];
     pic.onload = ()=> pic.classList.add('show');
-    pic.onerror = ()=>{ idx++; if(idx<order.length) next(); else { newRound(); next(); } };  // 坏图自动跳过
+    pic.onerror = ()=>{ idx++; showNext(); };   // 坏图自动跳过
+
     bar.textContent = (idx+1)+' / '+order.length;
-    bar.classList.add('on'); setTimeout(()=> bar.classList.remove('on'), 1200);
+    bar.classList.add('on'); setTimeout(()=> bar.classList.remove('on'), 1000);
+
     idx++;
-    if(idx >= order.length) setTimeout(()=>{ newRound(); next(); }, SEC*1000);
-    else timer = setTimeout(next, SEC*1000);
-  }, 520);
+    timer = setTimeout(showNext, SEC*1000);
+  }, 480);
 }
 
-/* ---- 触屏：左滑下一张、右滑上一张、轻点显示进度 ---- */
-let tx=0;
-document.addEventListener('touchstart', e=>{ tx=e.changedTouches[0].screenX; }, {passive:true});
-document.addEventListener('touchend', e=>{
-  const dx=e.changedTouches[0].screenX-tx;
-  if(Math.abs(dx)>40){
-    clearTimeout(timer);
-    if(dx<0) next(); else { idx=Math.max(0,idx-2); next(); }
-  } else { bar.classList.add('on'); setTimeout(()=> bar.classList.remove('on'),1200); }
-}, {passive:true});
+/* ---------- 播放结束 ---------- */
+function finish(){
+  clearTimeout(timer);
+  playedSpan.textContent = order.length;
+  endScr.classList.remove('hide');
+}
 
-/* ---- PWA 安装按钮（仅安卓 Chrome 会触发）---- */
-let deferredPrompt=null;
-const btn=document.getElementById('installBtn');
-window.addEventListener('beforeinstallprompt', e=>{
-  e.preventDefault(); deferredPrompt=e; btn.style.display='block';
+/* ---------- 按钮绑定 ---------- */
+document.getElementById('startBtn').addEventListener('click', startRound);
+document.getElementById('againBtn').addEventListener('click', startRound);
+
+/* ---------- 保持屏幕常亮（安卓有效） ---------- */
+let wakeLock=null;
+async function keepAwake(){
+  try{ if('wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible') keepAwake();
 });
-btn.addEventListener('click', async ()=>{
+document.addEventListener('click', keepAwake, {once:true});
+
+/* ---------- PWA 安装按钮 ---------- */
+let deferredPrompt=null;
+const instBtn=document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt', e=>{
+  e.preventDefault(); deferredPrompt=e; instBtn.style.display='block';
+});
+instBtn.addEventListener('click', async ()=>{
   if(!deferredPrompt) return;
   deferredPrompt.prompt();
   const r=await deferredPrompt.userChoice;
-  if(r.outcome==='accepted') btn.style.display='none';
+  if(r.outcome==='accepted') instBtn.style.display='none';
   deferredPrompt=null;
 });
-window.addEventListener('appinstalled', ()=>{ btn.style.display='none'; });
+window.addEventListener('appinstalled', ()=>{ instBtn.style.display='none'; });
 
-/* ---- 注册 Service Worker（离线可用）---- */
+/* ---------- 注册 Service Worker（离线可用） ---------- */
 if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
-
-newRound(); checkOri(); next();
 </script>
 </body>
 </html>
+
