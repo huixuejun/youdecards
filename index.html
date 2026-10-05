@@ -96,24 +96,6 @@ document.addEventListener('touchend', e=>{
   } else { bar.classList.add('on'); setTimeout(()=> bar.classList.remove('on'),1200); }
 }, {passive:true});
 
-/* ---- 横屏提示 & 点击开始 ---- */
-function checkOri(){
-  hint.style.display = 'none';
-}
-
-window.addEventListener('resize', checkOri);
-
-window.addEventListener('DOMContentLoaded', () => {
-  checkOri();
-});
-
-hint.addEventListener('click', () => {
-  keepAwake();
-  checkOri();
-});
-
-document.addEventListener('click', () => keepAwake(), { once: true });
-
 /* ---- PWA 安装按钮（仅安卓 Chrome 会触发）---- */
 let deferredPrompt=null;
 const btn=document.getElementById('installBtn');
